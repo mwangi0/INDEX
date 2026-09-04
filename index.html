@@ -185,7 +185,7 @@
 <body>
 
     <h1>🧸 Kemono API Viewer</h1>
-    <div class="sub">Browse creators, posts, and more — all from a single HTML file</div>
+    <div class="sub">Browse posts, artists, and fancards</div>
 
     <div class="warning">
         ⚠️ <strong>CORS Unblock</strong> must be enabled for this to work.<br>
@@ -194,16 +194,15 @@
 
     <div class="controls">
         <select id="endpointSelect">
-            <option value="creators">📋 All Creators</option>
             <option value="recent">🆕 Recent Posts</option>
             <option value="random">🎲 Random Post</option>
-            <option value="popular">🔥 Popular Posts (today)</option>
+            <option value="popular">🔥 Popular Posts</option>
             <option value="tags">🏷️ All Tags</option>
             <option value="artist">👤 Artist Profile</option>
             <option value="artistPosts">📄 Artist Posts</option>
-            <option value="fancards">💳 Fancards (Fanbox only)</option>
+            <option value="fancards">💳 Fancards</option>
         </select>
-        <input type="text" id="serviceInput" placeholder="Service (e.g. fanbox)" value="fanbox" />
+        <input type="text" id="serviceInput" placeholder="Service (fanbox)" value="fanbox" />
         <input type="text" id="creatorIdInput" placeholder="Creator ID" value="21101760" />
         <button id="fetchBtn">▶ Fetch</button>
     </div>
@@ -251,7 +250,7 @@
                         <div class="meta">${escapeHtml(meta)}</div>
                         <div class="content">${escapeHtml(content)}</div>
                         ${file ? `<div class="file-path">📎 ${escapeHtml(file)}</div>` : ''}
-                        <div class="badge">${item.service || item.user_id ? 'fanbox' : '?'}</div>
+                        <div class="badge">${item.service || '?'}</div>
                     </div>
                 `;
             }
@@ -291,24 +290,9 @@
 
             let url = '';
             let parseFn = null;
-            let acceptHeader = 'application/json'; // default
 
             try {
                 switch (endpoint) {
-                    case 'creators':
-                        url = `${API_BASE}/v1/creators.txt`;
-                        acceptHeader = 'text/css'; // 🔥 FIX: API requires this for creators.txt
-                        parseFn = (data) => {
-                            renderCards(
-                                data,
-                                (c) => c.name || 'Unnamed',
-                                (c) => `ID: ${c.id} · ${c.service} · Updated: ${new Date(c.updated * 1000).toLocaleDateString()}`,
-                                (c) => `⭐ Favorited: ${c.favorited} · Indexed: ${new Date(c.indexed * 1000).toLocaleDateString()}`,
-                                null
-                            );
-                        };
-                        break;
-
                     case 'recent':
                         url = `${API_BASE}/v1/posts?o=0`;
                         parseFn = (data) => {
@@ -415,10 +399,9 @@
                 }
 
                 console.log(`Fetching: ${url}`);
-                console.log(`Using Accept header: ${acceptHeader}`);
                 
                 const resp = await fetch(url, {
-                    headers: { 'Accept': acceptHeader }
+                    headers: { 'Accept': 'application/json' }
                 });
 
                 if (!resp.ok) {
