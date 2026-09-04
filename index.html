@@ -27,6 +27,15 @@
             margin-bottom: 1.5rem;
             font-size: 0.95rem;
         }
+        .warning {
+            background: #1e1a0d;
+            border: 1px solid #ffb34744;
+            color: #ffb347;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -176,6 +185,10 @@
     <h1>🧸 Kemono API Viewer</h1>
     <div class="sub">Browse creators, posts, and more — all from a single HTML file</div>
 
+    <div class="warning">
+        ⚠️ Using CORS proxy (corsproxy.io). Free proxies may have rate limits.
+    </div>
+
     <div class="controls">
         <select id="endpointSelect">
             <option value="creators">📋 All Creators</option>
@@ -196,6 +209,8 @@
     </div>
 
     <script>
+        // CORS proxy — you can change this to any proxy that supports CORS
+        const PROXY = 'https://api.corsproxy.io/?url=';
         const API_BASE = 'https://kemono.cr/api';
 
         const endpointSelect = document.getElementById('endpointSelect');
@@ -366,7 +381,10 @@
                         return;
                 }
 
-                const resp = await fetch(url, {
+                // Use proxy to bypass CORS
+                const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
+
+                const resp = await fetch(proxyUrl, {
                     headers: { 'Accept': 'application/json' }
                 });
 
