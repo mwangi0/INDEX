@@ -139,33 +139,23 @@
             padding: 40px;
             color: #666;
         }
+        .loader::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
+        }
         .error {
             color: #ff7b89;
             background: #1e0d0d;
             padding: 16px;
             border-radius: 8px;
             border: 1px solid #ff7b8944;
-        }
-        .pagination {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-            justify-content: center;
-            align-items: center;
-        }
-        .pagination button {
-            background: #1e1e1e;
-            color: #eee;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        .pagination button:hover {
-            background: #2a2a2a;
-        }
-        .pagination span {
-            color: #888;
         }
         @media (max-width: 600px) {
             .controls {
@@ -186,7 +176,7 @@
     <div class="sub">Browse creators, posts, and more — all from a single HTML file</div>
 
     <div class="warning">
-        ⚠️ Using CORS proxy (corsproxy.io). Free proxies may have rate limits.
+        ⚠️ Using CORS proxy (corsproxy.io). Requests may be rate-limited. If it fails, try again later.
     </div>
 
     <div class="controls">
@@ -209,8 +199,14 @@
     </div>
 
     <script>
-        // CORS proxy — you can change this to any proxy that supports CORS
-        const PROXY = 'https://api.corsproxy.io/?url=';
+        // Use multiple CORS proxies (fallback if one fails)
+        const PROXIES = [
+            'https://api.corsproxy.io/?url=',
+            'https://corsproxy.io/?url=',
+            'https://thingproxy.freeboard.io/fetch/'
+        ];
+        
+        let currentProxyIndex = 0;
         const API_BASE = 'https://kemono.cr/api';
 
         const endpointSelect = document.getElementById('endpointSelect');
@@ -219,9 +215,8 @@
         const fetchBtn = document.getElementById('fetchBtn');
         const resultsDiv = document.getElementById('results');
 
-        // --- helpers ---
         function showLoader() {
-            resultsDiv.innerHTML = `<div class="loader">⏳ Loading...</div>`;
+            resultsDiv.innerHTML = `<div class="loader">⏳ Loading</div>`;
         }
 
         function showError(msg) {
@@ -263,7 +258,24 @@
             return str.length > len ? str.slice(0, len) + '…' : str;
         }
 
-        // --- fetch logic ---
+        async function fetchWithProxy(url, retries = 2) {
+            for (let attempt = 0; attempt < PROXIES.length; attempt++) {
+                try {
+                    const proxyUrl = PROXIES[attempt] + encodeURIComponent(url);
+                    const resp = await fetch(proxyUrl, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (resp.ok) {
+                        return await resp.json();
+                    }
+                } catch (e) {
+                    console.log(`Proxy ${attempt} failed:`, e.message);
+                    continue;
+                }
+            }
+            throw new Error('All CORS proxies failed. Please try again later.');
+        }
+
         async function fetchData() {
             const endpoint = endpointSelect.value;
             const service = serviceInput.value.trim() || 'fanbox';
@@ -381,19 +393,7 @@
                         return;
                 }
 
-                // Use proxy to bypass CORS
-                const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
-
-                const resp = await fetch(proxyUrl, {
-                    headers: { 'Accept': 'application/json' }
-                });
-
-                if (!resp.ok) {
-                    const text = await resp.text();
-                    throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`);
-                }
-
-                const data = await resp.json();
+                const data = await fetchWithProxy(url);
                 if (data.error) {
                     showError(data.error);
                     return;
@@ -406,10 +406,7 @@
             }
         }
 
-        // --- event listeners ---
         fetchBtn.addEventListener('click', fetchData);
-
-        // load initial data
         fetchData();
     </script>
 
