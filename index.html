@@ -233,7 +233,7 @@
         }
 
         function renderCards(items, titleFn, metaFn, contentFn, fileFn) {
-            // ✅ FIX: Ensure items is always an array
+            // ✅ Ensure items is always an array
             if (!items || !Array.isArray(items) || items.length === 0) {
                 resultsDiv.innerHTML = `<div class="error">No results found.</div>`;
                 return;
@@ -292,6 +292,7 @@
 
             let url = '';
             let parseFn = null;
+            let acceptHeader = 'application/json'; // default for most endpoints
 
             try {
                 switch (endpoint) {
@@ -389,6 +390,7 @@
 
                     case 'fancards':
                         url = `${API_BASE}/v1/${service}/user/${creatorId}/fancards`;
+                        acceptHeader = 'text/css'; // 🔥 FIX: API requires this for fancards
                         parseFn = (data) => {
                             // ✅ Ensure data is an array
                             const cards = Array.isArray(data) ? data : [];
@@ -408,9 +410,10 @@
                 }
 
                 console.log(`Fetching: ${url}`);
+                console.log(`Using Accept header: ${acceptHeader}`);
                 
                 const resp = await fetch(url, {
-                    headers: { 'Accept': 'application/json' }
+                    headers: { 'Accept': acceptHeader }
                 });
 
                 if (!resp.ok) {
