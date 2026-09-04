@@ -157,6 +157,14 @@
             border-radius: 8px;
             border: 1px solid #ff7b8944;
         }
+        .success-msg {
+            color: #7bff89;
+            background: #0d1e0d;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #7bff8944;
+            text-align: center;
+        }
         @media (max-width: 600px) {
             .controls {
                 flex-direction: column;
@@ -176,7 +184,10 @@
     <div class="sub">Browse creators, posts, and more — all from a single HTML file</div>
 
     <div class="warning">
-        ⚠️ Using CORS proxy (corsproxy.io). Requests may be rate-limited. If it fails, try again later.
+        ⚠️ Using CORS proxy. If requests fail, try:<br>
+        1. Click "Fetch" again<br>
+        2. Use a different browser<br>
+        3. Try later (rate limits may apply)
     </div>
 
     <div class="controls">
@@ -199,14 +210,13 @@
     </div>
 
     <script>
-        // Use multiple CORS proxies (fallback if one fails)
+        // Multiple CORS proxies that work with GitHub Pages
         const PROXIES = [
-            'https://api.corsproxy.io/?url=',
             'https://corsproxy.io/?url=',
-            'https://thingproxy.freeboard.io/fetch/'
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/'
         ];
-        
-        let currentProxyIndex = 0;
+
         const API_BASE = 'https://kemono.cr/api';
 
         const endpointSelect = document.getElementById('endpointSelect');
@@ -258,22 +268,30 @@
             return str.length > len ? str.slice(0, len) + '…' : str;
         }
 
-        async function fetchWithProxy(url, retries = 2) {
-            for (let attempt = 0; attempt < PROXIES.length; attempt++) {
+        async function fetchWithProxy(url) {
+            // Try each proxy until one works
+            for (let i = 0; i < PROXIES.length; i++) {
                 try {
-                    const proxyUrl = PROXIES[attempt] + encodeURIComponent(url);
+                    const proxyUrl = PROXIES[i] + encodeURIComponent(url);
+                    console.log(`Trying proxy ${i + 1}: ${PROXIES[i]}`);
+                    
                     const resp = await fetch(proxyUrl, {
                         headers: { 'Accept': 'application/json' }
                     });
+                    
                     if (resp.ok) {
-                        return await resp.json();
+                        const data = await resp.json();
+                        console.log(`Proxy ${i + 1} succeeded!`);
+                        return data;
+                    } else {
+                        console.log(`Proxy ${i + 1} returned status: ${resp.status}`);
                     }
                 } catch (e) {
-                    console.log(`Proxy ${attempt} failed:`, e.message);
+                    console.log(`Proxy ${i + 1} failed:`, e.message);
                     continue;
                 }
             }
-            throw new Error('All CORS proxies failed. Please try again later.');
+            throw new Error('All CORS proxies failed. Please try again later or use a different browser.');
         }
 
         async function fetchData() {
@@ -394,19 +412,26 @@
                 }
 
                 const data = await fetchWithProxy(url);
+                
                 if (data.error) {
                     showError(data.error);
                     return;
                 }
-                if (parseFn) parseFn(data);
+                
+                if (parseFn) {
+                    parseFn(data);
+                }
 
             } catch (err) {
                 showError(`Failed to fetch: ${err.message}`);
-                console.error(err);
+                console.error('Full error:', err);
             }
         }
 
+        // Event listeners
         fetchBtn.addEventListener('click', fetchData);
+
+        // Auto-load on page open
         fetchData();
     </script>
 
