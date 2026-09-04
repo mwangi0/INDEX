@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kemono API Viewer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0d0d0d;
+            color: #eee;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            color: #ff7b89;
+        }
+        .sub {
+            color: #888;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .controls input,
+        .controls select,
+        .controls button {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            background: #1e1e1e;
+            color: #eee;
+            font-size: 1rem;
+            min-width: 120px;
+        }
+        .controls input::placeholder {
+            color: #666;
+        }
+        .controls button {
+            background: #ff7b89;
+            color: #0d0d0d;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .controls button:hover {
+            background: #ff5a6a;
+        }
+        .controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+        }
+        .card {
+            background: #181818;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #2a2a2a;
+            transition: 0.2s;
+            word-break: break-word;
+        }
+        .card:hover {
+            border-color: #ff7b8944;
+        }
+        .card h3 {
+            font-size: 1.1rem;
+            color: #ffb3b3;
+            margin-bottom: 6px;
+        }
+        .card .meta {
+            font-size: 0.8rem;
+            color: #999;
+            margin-bottom: 8px;
+        }
+        .card .content {
+            font-size: 0.9rem;
+            color: #ccc;
+            max-height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+        .card .content::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, #181818);
+        }
+        .card .file-path {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 8px;
+            font-family: monospace;
+            background: #0d0d0d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .card .badge {
+            display: inline-block;
+            background: #2a2a2a;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-top: 6px;
+        }
+        .loader {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            color: #ff7b89;
+            background: #1e0d0d;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #ff7b8944;
+        }
+        .pagination {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            justify-content: center;
+            align-items: center;
+        }
+        .pagination button {
+            background: #1e1e1e;
+            color: #eee;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .pagination button:hover {
+            background: #2a2a2a;
+        }
+        .pagination span {
+            color: #888;
+        }
+        @media (max-width: 600px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .controls input,
+            .controls select,
+            .controls button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🧸 Kemono API Viewer</h1>
+    <div class="sub">Browse creators, posts, and more — all from a single HTML file</div>
+
+    <div class="controls">
+        <select id="endpointSelect">
+            <option value="creators">📋 All Creators</option>
+            <option value="recent">🆕 Recent Posts</option>
+            <option value="random">🎲 Random Post</option>
+            <option value="popular">🔥 Popular Posts (today)</option>
+            <option value="tags">🏷️ All Tags</option>
+            <option value="artist">👤 Artist Profile</option>
+            <option value="artistPosts">📄 Artist Posts</option>
+        </select>
+        <input type="text" id="serviceInput" placeholder="Service (e.g. fanbox)" value="fanbox" />
+        <input type="text" id="creatorIdInput" placeholder="Creator ID" value="21101760" />
+        <button id="fetchBtn">▶ Fetch</button>
+    </div>
+
+    <div id="results">
+        <div class="loader">Click "Fetch" to load data</div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://kemono.cr/api';
+
+        const endpointSelect = document.getElementById('endpointSelect');
+        const serviceInput = document.getElementById('serviceInput');
+        const creatorIdInput = document.getElementById('creatorIdInput');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const resultsDiv = document.getElementById('results');
+
+        // --- helpers ---
+        function showLoader() {
+            resultsDiv.innerHTML = `<div class="loader">⏳ Loading...</div>`;
+        }
+
+        function showError(msg) {
+            resultsDiv.innerHTML = `<div class="error">❌ ${msg}</div>`;
+        }
+
+        function renderCards(items, titleFn, metaFn, contentFn, fileFn) {
+            if (!items || items.length === 0) {
+                resultsDiv.innerHTML = `<div class="error">No results found.</div>`;
+                return;
+            }
+            let html = `<div class="grid">`;
+            for (const item of items) {
+                const title = titleFn(item) || 'Untitled';
+                const meta = metaFn(item) || '';
+                const content = contentFn(item) || '';
+                const file = fileFn ? fileFn(item) : '';
+                html += `
+                    <div class="card">
+                        <h3>${escapeHtml(title)}</h3>
+                        <div class="meta">${escapeHtml(meta)}</div>
+                        <div class="content">${escapeHtml(content)}</div>
+                        ${file ? `<div class="file-path">📎 ${escapeHtml(file)}</div>` : ''}
+                        <div class="badge">${item.service || '?'}</div>
+                    </div>
+                `;
+            }
+            html += `</div>`;
+            resultsDiv.innerHTML = html;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } [m] || m));
+        }
+
+        function truncate(str, len = 120) {
+            if (!str) return '';
+            return str.length > len ? str.slice(0, len) + '…' : str;
+        }
+
+        // --- fetch logic ---
+        async function fetchData() {
+            const endpoint = endpointSelect.value;
+            const service = serviceInput.value.trim() || 'fanbox';
+            const creatorId = creatorIdInput.value.trim() || '21101760';
+
+            showLoader();
+
+            let url = '';
+            let parseFn = null;
+
+            try {
+                switch (endpoint) {
+                    case 'creators':
+                        url = `${API_BASE}/v1/creators.txt`;
+                        parseFn = (data) => {
+                            renderCards(
+                                data,
+                                (c) => c.name || 'Unnamed',
+                                (c) => `ID: ${c.id} · ${c.service} · Updated: ${new Date(c.updated * 1000).toLocaleDateString()}`,
+                                (c) => `Favorited: ${c.favorited} · Indexed: ${new Date(c.indexed * 1000).toLocaleDateString()}`,
+                                null
+                            );
+                        };
+                        break;
+
+                    case 'recent':
+                        url = `${API_BASE}/v1/posts?o=0`;
+                        parseFn = (data) => {
+                            renderCards(
+                                data,
+                                (p) => p.title || 'No title',
+                                (p) => `${p.service} · ${p.user} · ${new Date(p.published).toLocaleDateString()}`,
+                                (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
+                                (p) => p.file?.path || (p.attachments?.[0]?.path || '')
+                            );
+                        };
+                        break;
+
+                    case 'random':
+                        url = `${API_BASE}/v1/posts/random`;
+                        parseFn = (data) => {
+                            if (data.error) return showError(data.error);
+                            resultsDiv.innerHTML = `
+                                <div class="card" style="max-width:500px;margin:0 auto;">
+                                    <h3>🎲 Random Post</h3>
+                                    <div class="meta">Service: ${data.service} · Artist: ${data.artist_id}</div>
+                                    <div class="content">Post ID: ${data.post_id}</div>
+                                    <div class="badge">${data.service}</div>
+                                </div>
+                            `;
+                        };
+                        break;
+
+                    case 'popular':
+                        const today = new Date().toISOString().split('T')[0];
+                        url = `${API_BASE}/v1/posts/popular?date=${today}&period=day&o=0`;
+                        parseFn = (data) => {
+                            const posts = data.results || [];
+                            renderCards(
+                                posts,
+                                (p) => p.title || 'No title',
+                                (p) => `${p.service} · ${p.user} · ❤️ ${p.fav_count || 0}`,
+                                (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
+                                (p) => p.file?.path || (p.attachments?.[0]?.path || '')
+                            );
+                        };
+                        break;
+
+                    case 'tags':
+                        url = `${API_BASE}/v1/posts/tags`;
+                        parseFn = (data) => {
+                            const tags = data.tags || [];
+                            renderCards(
+                                tags,
+                                (t) => `#${t.tag}`,
+                                (t) => `${t.post_count} posts`,
+                                () => '',
+                                null
+                            );
+                        };
+                        break;
+
+                    case 'artist':
+                        url = `${API_BASE}/v1/${service}/user/${creatorId}/profile`;
+                        parseFn = (data) => {
+                            if (data.error) return showError(data.error);
+                            resultsDiv.innerHTML = `
+                                <div class="card" style="max-width:500px;margin:0 auto;">
+                                    <h3>👤 ${data.name || 'Unnamed'}</h3>
+                                    <div class="meta">ID: ${data.id} · ${data.service}</div>
+                                    <div class="content">Public ID: ${data.public_id || 'N/A'}</div>
+                                    <div class="file-path">Indexed: ${new Date(data.indexed).toLocaleString()}</div>
+                                    <div class="badge">${data.service}</div>
+                                </div>
+                            `;
+                        };
+                        break;
+
+                    case 'artistPosts':
+                        url = `${API_BASE}/v1/${service}/user/${creatorId}/posts`;
+                        parseFn = (data) => {
+                            const posts = data.results || [];
+                            renderCards(
+                                posts,
+                                (p) => p.title || 'No title',
+                                (p) => `${p.service} · ${p.user} · ${new Date(p.published).toLocaleDateString()}`,
+                                (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
+                                (p) => p.file?.path || (p.attachments?.[0]?.path || '')
+                            );
+                        };
+                        break;
+
+                    default:
+                        showError('Unknown endpoint');
+                        return;
+                }
+
+                const resp = await fetch(url, {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`);
+                }
+
+                const data = await resp.json();
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                if (parseFn) parseFn(data);
+
+            } catch (err) {
+                showError(`Failed to fetch: ${err.message}`);
+                console.error(err);
+            }
+        }
+
+        // --- event listeners ---
+        fetchBtn.addEventListener('click', fetchData);
+
+        // load initial data
+        fetchData();
+    </script>
+
+</body>
+</html>
