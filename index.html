@@ -233,10 +233,12 @@
         }
 
         function renderCards(items, titleFn, metaFn, contentFn, fileFn) {
-            if (!items || items.length === 0) {
+            // ✅ FIX: Ensure items is always an array
+            if (!items || !Array.isArray(items) || items.length === 0) {
                 resultsDiv.innerHTML = `<div class="error">No results found.</div>`;
                 return;
             }
+            
             let html = showStats(items.length);
             html += `<div class="grid">`;
             for (const item of items) {
@@ -296,8 +298,10 @@
                     case 'recent':
                         url = `${API_BASE}/v1/posts?o=0`;
                         parseFn = (data) => {
+                            // ✅ Ensure data is an array
+                            const posts = Array.isArray(data) ? data : [];
                             renderCards(
-                                data,
+                                posts,
                                 (p) => p.title || 'No title',
                                 (p) => `${p.service} · ${p.user} · ${formatDate(p.published)}`,
                                 (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
@@ -325,7 +329,8 @@
                         const today = new Date().toISOString().split('T')[0];
                         url = `${API_BASE}/v1/posts/popular?date=${today}&period=day&o=0`;
                         parseFn = (data) => {
-                            const posts = data.results || [];
+                            // ✅ Ensure results is an array
+                            const posts = data?.results && Array.isArray(data.results) ? data.results : [];
                             renderCards(
                                 posts,
                                 (p) => p.title || 'No title',
@@ -339,7 +344,8 @@
                     case 'tags':
                         url = `${API_BASE}/v1/posts/tags`;
                         parseFn = (data) => {
-                            const tags = data.tags || [];
+                            // ✅ Ensure tags is an array
+                            const tags = data?.tags && Array.isArray(data.tags) ? data.tags : [];
                             renderCards(
                                 tags,
                                 (t) => `#${t.tag}`,
@@ -369,7 +375,8 @@
                     case 'artistPosts':
                         url = `${API_BASE}/v1/${service}/user/${creatorId}/posts`;
                         parseFn = (data) => {
-                            const posts = data.results || [];
+                            // ✅ Ensure results is an array
+                            const posts = data?.results && Array.isArray(data.results) ? data.results : [];
                             renderCards(
                                 posts,
                                 (p) => p.title || 'No title',
@@ -383,8 +390,10 @@
                     case 'fancards':
                         url = `${API_BASE}/v1/${service}/user/${creatorId}/fancards`;
                         parseFn = (data) => {
+                            // ✅ Ensure data is an array
+                            const cards = Array.isArray(data) ? data : [];
                             renderCards(
-                                data,
+                                cards,
                                 (f) => f.mime || 'Fancard',
                                 (f) => `Size: ${(f.size / 1024).toFixed(1)} KB · Added: ${formatDate(f.added)}`,
                                 (f) => `Hash: ${f.hash?.slice(0, 20)}...`,
