@@ -160,14 +160,6 @@
             border-radius: 8px;
             border: 1px solid #ff7b8944;
         }
-        .success-msg {
-            color: #7bff89;
-            background: #0d1e0d;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #7bff8944;
-            text-align: center;
-        }
         .stats {
             color: #888;
             font-size: 0.9rem;
@@ -299,11 +291,13 @@
 
             let url = '';
             let parseFn = null;
+            let acceptHeader = 'application/json'; // default
 
             try {
                 switch (endpoint) {
                     case 'creators':
                         url = `${API_BASE}/v1/creators.txt`;
+                        acceptHeader = 'text/css'; // 🔥 FIX: API requires this for creators.txt
                         parseFn = (data) => {
                             renderCards(
                                 data,
@@ -421,8 +415,10 @@
                 }
 
                 console.log(`Fetching: ${url}`);
+                console.log(`Using Accept header: ${acceptHeader}`);
+                
                 const resp = await fetch(url, {
-                    headers: { 'Accept': 'application/json' }
+                    headers: { 'Accept': acceptHeader }
                 });
 
                 if (!resp.ok) {
