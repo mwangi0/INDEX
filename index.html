@@ -36,6 +36,9 @@
             margin-bottom: 16px;
             font-size: 0.9rem;
         }
+        .warning strong {
+            color: #ff7b89;
+        }
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -165,6 +168,15 @@
             border: 1px solid #7bff8944;
             text-align: center;
         }
+        .stats {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            padding: 10px;
+            background: #141414;
+            border-radius: 8px;
+            border: 1px solid #2a2a2a;
+        }
         @media (max-width: 600px) {
             .controls {
                 flex-direction: column;
@@ -184,10 +196,8 @@
     <div class="sub">Browse creators, posts, and more — all from a single HTML file</div>
 
     <div class="warning">
-        ⚠️ Using CORS proxy. If requests fail, try:<br>
-        1. Click "Fetch" again<br>
-        2. Use a different browser<br>
-        3. Try later (rate limits may apply)
+        ⚠️ <strong>CORS Unblock</strong> must be enabled for this to work.<br>
+        Install the extension, click its icon to activate it, then refresh the page.
     </div>
 
     <div class="controls">
@@ -199,6 +209,7 @@
             <option value="tags">🏷️ All Tags</option>
             <option value="artist">👤 Artist Profile</option>
             <option value="artistPosts">📄 Artist Posts</option>
+            <option value="fancards">💳 Fancards (Fanbox only)</option>
         </select>
         <input type="text" id="serviceInput" placeholder="Service (e.g. fanbox)" value="fanbox" />
         <input type="text" id="creatorIdInput" placeholder="Creator ID" value="21101760" />
@@ -210,13 +221,6 @@
     </div>
 
     <script>
-        // Multiple CORS proxies that work with GitHub Pages
-        const PROXIES = [
-            'https://corsproxy.io/?url=',
-            'https://api.allorigins.win/raw?url=',
-            'https://cors-anywhere.herokuapp.com/'
-        ];
-
         const API_BASE = 'https://kemono.cr/api';
 
         const endpointSelect = document.getElementById('endpointSelect');
@@ -233,12 +237,17 @@
             resultsDiv.innerHTML = `<div class="error">❌ ${msg}</div>`;
         }
 
+        function showStats(count, label = 'items') {
+            return `<div class="stats">📊 Found <strong>${count}</strong> ${label}</div>`;
+        }
+
         function renderCards(items, titleFn, metaFn, contentFn, fileFn) {
             if (!items || items.length === 0) {
                 resultsDiv.innerHTML = `<div class="error">No results found.</div>`;
                 return;
             }
-            let html = `<div class="grid">`;
+            let html = showStats(items.length);
+            html += `<div class="grid">`;
             for (const item of items) {
                 const title = titleFn(item) || 'Untitled';
                 const meta = metaFn(item) || '';
@@ -250,7 +259,7 @@
                         <div class="meta">${escapeHtml(meta)}</div>
                         <div class="content">${escapeHtml(content)}</div>
                         ${file ? `<div class="file-path">📎 ${escapeHtml(file)}</div>` : ''}
-                        <div class="badge">${item.service || '?'}</div>
+                        <div class="badge">${item.service || item.user_id ? 'fanbox' : '?'}</div>
                     </div>
                 `;
             }
@@ -268,30 +277,17 @@
             return str.length > len ? str.slice(0, len) + '…' : str;
         }
 
-        async function fetchWithProxy(url) {
-            // Try each proxy until one works
-            for (let i = 0; i < PROXIES.length; i++) {
-                try {
-                    const proxyUrl = PROXIES[i] + encodeURIComponent(url);
-                    console.log(`Trying proxy ${i + 1}: ${PROXIES[i]}`);
-                    
-                    const resp = await fetch(proxyUrl, {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        console.log(`Proxy ${i + 1} succeeded!`);
-                        return data;
-                    } else {
-                        console.log(`Proxy ${i + 1} returned status: ${resp.status}`);
-                    }
-                } catch (e) {
-                    console.log(`Proxy ${i + 1} failed:`, e.message);
-                    continue;
-                }
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                return new Date(dateStr).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } catch {
+                return dateStr;
             }
-            throw new Error('All CORS proxies failed. Please try again later or use a different browser.');
         }
 
         async function fetchData() {
@@ -313,7 +309,7 @@
                                 data,
                                 (c) => c.name || 'Unnamed',
                                 (c) => `ID: ${c.id} · ${c.service} · Updated: ${new Date(c.updated * 1000).toLocaleDateString()}`,
-                                (c) => `Favorited: ${c.favorited} · Indexed: ${new Date(c.indexed * 1000).toLocaleDateString()}`,
+                                (c) => `⭐ Favorited: ${c.favorited} · Indexed: ${new Date(c.indexed * 1000).toLocaleDateString()}`,
                                 null
                             );
                         };
@@ -325,7 +321,7 @@
                             renderCards(
                                 data,
                                 (p) => p.title || 'No title',
-                                (p) => `${p.service} · ${p.user} · ${new Date(p.published).toLocaleDateString()}`,
+                                (p) => `${p.service} · ${p.user} · ${formatDate(p.published)}`,
                                 (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
                                 (p) => p.file?.path || (p.attachments?.[0]?.path || '')
                             );
@@ -337,7 +333,7 @@
                         parseFn = (data) => {
                             if (data.error) return showError(data.error);
                             resultsDiv.innerHTML = `
-                                <div class="card" style="max-width:500px;margin:0 auto;">
+                                <div class="card" style="max-width:500px;margin:20px auto;">
                                     <h3>🎲 Random Post</h3>
                                     <div class="meta">Service: ${data.service} · Artist: ${data.artist_id}</div>
                                     <div class="content">Post ID: ${data.post_id}</div>
@@ -355,7 +351,7 @@
                             renderCards(
                                 posts,
                                 (p) => p.title || 'No title',
-                                (p) => `${p.service} · ${p.user} · ❤️ ${p.fav_count || 0}`,
+                                (p) => `${p.service} · ${p.user} · ❤️ ${p.fav_count || 0} likes`,
                                 (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
                                 (p) => p.file?.path || (p.attachments?.[0]?.path || '')
                             );
@@ -381,11 +377,11 @@
                         parseFn = (data) => {
                             if (data.error) return showError(data.error);
                             resultsDiv.innerHTML = `
-                                <div class="card" style="max-width:500px;margin:0 auto;">
+                                <div class="card" style="max-width:500px;margin:20px auto;">
                                     <h3>👤 ${data.name || 'Unnamed'}</h3>
                                     <div class="meta">ID: ${data.id} · ${data.service}</div>
                                     <div class="content">Public ID: ${data.public_id || 'N/A'}</div>
-                                    <div class="file-path">Indexed: ${new Date(data.indexed).toLocaleString()}</div>
+                                    <div class="file-path">📅 Indexed: ${formatDate(data.indexed)}</div>
                                     <div class="badge">${data.service}</div>
                                 </div>
                             `;
@@ -399,9 +395,22 @@
                             renderCards(
                                 posts,
                                 (p) => p.title || 'No title',
-                                (p) => `${p.service} · ${p.user} · ${new Date(p.published).toLocaleDateString()}`,
+                                (p) => `${p.service} · ${p.user} · ${formatDate(p.published)}`,
                                 (p) => truncate(p.content?.replace(/<[^>]+>/g, '') || 'No content', 150),
                                 (p) => p.file?.path || (p.attachments?.[0]?.path || '')
+                            );
+                        };
+                        break;
+
+                    case 'fancards':
+                        url = `${API_BASE}/v1/${service}/user/${creatorId}/fancards`;
+                        parseFn = (data) => {
+                            renderCards(
+                                data,
+                                (f) => f.mime || 'Fancard',
+                                (f) => `Size: ${(f.size / 1024).toFixed(1)} KB · Added: ${formatDate(f.added)}`,
+                                (f) => `Hash: ${f.hash?.slice(0, 20)}...`,
+                                (f) => f.ext || ''
                             );
                         };
                         break;
@@ -411,7 +420,17 @@
                         return;
                 }
 
-                const data = await fetchWithProxy(url);
+                console.log(`Fetching: ${url}`);
+                const resp = await fetch(url, {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`);
+                }
+
+                const data = await resp.json();
                 
                 if (data.error) {
                     showError(data.error);
